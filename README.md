@@ -12,7 +12,7 @@ El umbral de referencia de embriaguez marcada utilizado en todo el proyecto es *
 | :--- | :--- | :--- |
 | **Sprint 1** | Estructura del repositorio, constantes compartidas (`src/constants.py`) y generador reproducible de 15,000 sesiones (`src/generate_data.py` -> `data/synthetic_bac_dataset.csv`). | **Completado** |
 | **Sprint 2** | Notebook autónomo (`notebooks/analisis_malacopa.ipynb`) con EDA fisiológico, `RandomForestRegressor` sin *data leakage*, auditoría biológica de residuales, demostración del mito y exportación del modelo (`models/rf_bac_model.joblib`). | **Completado** |
-| **Sprint 3** | Motor de inferencia (`src/predictor.py`) y simulador web interactivo en Streamlit (`app.py`) para estimar tragos combinados y margen restante en vivo según horas de fiesta. | **Pendiente** |
+| **Sprint 3** | Motor de inferencia (`src/predictor.py`) y simulador web «Drunk enough?» (FastAPI + HTML/CSS/JS en `app/` y `static/`) para estimar tragos combinados, etapa y margen restante en vivo según horas de fiesta. | **Completado** (ver sección «Sprint 3» al final) |
 
 ---
 
@@ -118,3 +118,68 @@ python src/generate_data.py
 # 3. Ejecutar el notebook completo de análisis y entrenamiento
 jupyter nbconvert --to notebook --execute --inplace notebooks/analisis_malacopa.ipynb
 ```
+
+
+---
+
+## Sprint 3 — App web «Drunk enough?»
+
+Simulador local que estima el BAC (mg/100 mL) con el modelo real del Sprint 2, su banda ± MAE, la etapa en la que estarías y cómo te sentirías. Framework elegido: **FastAPI + HTML/CSS/JS estático** (sin build, sin CDN, sin `node_modules`).
+
+### Cómo correrlo
+
+Windows (Git Bash / PowerShell) o macOS/Linux, desde la raíz del proyecto:
+
+```bash
+python -m venv .venv
+# Windows:  .venv\Scripts\activate      macOS/Linux:  source .venv/bin/activate
+pip install -r requirements-app.txt
+
+pytest                      # 37 pruebas: perfiles A–D del experimento, banda, barrido, límites, API, avisos por etapa
+uvicorn app.main:app        # abre http://127.0.0.1:8000
+```
+
+Para abrirla desde otro equipo o celular (RNF-01): `uvicorn app.main:app --host 0.0.0.0` en la misma red, o `cloudflared tunnel --url http://localhost:8000`.
+
+> **Importante:** el modelo se serializó con **scikit-learn 1.9.1**. `requirements-app.txt` fija esa versión; con otra versión `load_model()` se niega a arrancar si scikit-learn emite advertencias de versión.
+
+### Estructura añadida
+
+```text
+app/main.py          FastAPI: GET /api/config, POST /api/estimate y sirve ./static en "/"
+src/predictor.py     carga única del modelo, predict_bac, calcular_margen, floor_half, simular
+src/drinks.py        catálogo de bebidas (ÚNICO lugar; los gramos se calculan)
+src/stages.py        etapas, mensajes, nota de mezclas, aviso y consejos (texto editable)
+static/              index.html, styles.css, app.js, api.js, art.js, format.js
+tests/               pytest del predictor y de la API
+requirements-app.txt dependencias mínimas de la app (versiones fijas)
+```
+
+No se modificaron el modelo, el dataset, el notebook ni `src/constants.py`.
+
+### Cómo cumple RF-01 a RF-07
+
+| Req. | Implementación |
+| :--- | :--- |
+| RF-01 | Sexo, edad, estatura, peso y duración (slider 0.5–6 h en pasos de 0.5). Validado también en el servidor (422 si sale de rango). La interfaz ya no pregunta el entrenamiento: `nivel_entrenamiento` es opcional en `/api/estimate` y vale 0 («No entrena») por defecto. |
+| RF-02 | Retirado de la interfaz por decisión de producto. Los perfiles A–D del experimento siguen en `tests/test_predictor.py` para validar el modelo. |
+| RF-03 | Contadores +/− por bebida generados desde `/api/config`, botón «Reiniciar tragos», recálculo en vivo. |
+| RF-04 | BAC central ± 17.82 (MAE de test) y rango `[max(0, pred−MAE), pred+MAE]`; barra semafórica verde < 60, naranja 60–119.9, rojo ≥ 120, con texto (no solo color). |
+| RF-05 | Barrido 0–220 g en pasos de **1 g** en **una sola** llamada vectorizada a `predict` (incluye la fila del consumo actual). Caso A (> 220 g): no hay predicción y aparece «Fuera de los límites de la simulación». Caso B: aviso de que el límite del perfil supera el tope. Piso en medios (`2.8 → 2.5`, `2.3 → 2`); 0 en todas las bebidas si ya se superó 120. |
+| RF-06 | «Ritmo de referencia»: gramos del perfil hasta 120 ÷ horas, en g/h y en unidades por hora (piso en medios). |
+| RF-07 | Aviso visible arriba (píldora), dentro de la tarjeta de resultado y en el pie de página. |
+
+Extra: «tu próximo cambio de etapa llega con N tragos más» sale del mismo barrido (piso en 0.5, en la bebida que tocaste por última vez y en las demás). Hay nota cualitativa de mezclas, aviso al cruzar de etapa (dentro del panel de resultado y en la barra móvil, sin tapar las bebidas), count-up, un vaso con burbujas que se llena con el BAC (lleno a 120 mg/100 mL) y se agita con cada trago, fondo y acento por etapa y cara SVG por etapa. En escritorio el panel de resultado queda fijo mientras bajas por las bebidas. Todo respeta `prefers-reduced-motion`.
+
+### Agregar una bebida
+
+Añade una entrada a `DRINK_CATALOG` en `src/drinks.py` (`id`, `nombre`, `singular`, `plural`, `volumen_ml`, `abv`, `vaso`, `color_liquido`). Los gramos se calculan con `volumen_ml × abv × 0.789`, y la API, la interfaz y el margen la incluyen sin tocar más código.
+
+### Supuestos (no salen del modelo)
+
+- **ABV de Ron (35 %), Smirnoff (37.5 %) y Bacardí (35 %):** valores típicos de etiqueta, por verificar. Cerveza (330 mL, 4 %) y Aguardiente (30 mL, 28 %, el «shot de licor» del repo) vienen de `src/constants.py`. Todos los shots se asumen de 30 mL.
+- **Etapas y mensajes** (`src/stages.py`): rangos <20, 20–50, 50–80, 80–120, 120–200 y >200 mg/100 mL, con descripciones generales orientativas.
+- **Nota de mezclas:** es cualitativa. El modelo solo cuenta gramos de etanol.
+- **«Próximo cambio de etapa» y «ritmo»:** son referencias informativas, nunca una meta.
+- **Rendimiento:** en memoria se usa `n_jobs=1` en el `RandomForestRegressor` (no cambia las predicciones, solo evita el costo de repartir hilos). Una estimación completa tarda unos 25–40 ms.
+- El modelo solo es válido dentro de los rangos de entrenamiento (18–65 años, 145–200 cm, 40–140 kg, 0.5–6 h, 0–220 g).

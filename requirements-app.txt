@@ -1,0 +1,9 @@
+# Dependencias mínimas para correr la app web «Drunk enough?» (Sprint 3).
+# (requirements.txt sigue siendo el del notebook; este archivo no instala Streamlit/Jupyter.)
+numpy==2.5.5
+pandas==3.1.1
+scikit-learn==1.9.1   # misma versión con la que se serializó models/rf_bac_model.joblib
+joblib==1.6.0
+fastapi==0.115.6
+uvicorn==0.34.0
+pytest==9.2.0         # solo para correr las pruebas

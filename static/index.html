@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Drunk enough? · Estima tu alcohol en sangre</title>
+  <meta name="description" content="Simulador educativo: estima tu alcohol en sangre según tu perfil, lo que tomas y cuántas horas dura la salida, y cómo te vas a sentir.">
+  <meta name="theme-color" content="#0a0c14">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M8 5H24L22 17Q16 22 10 17Z' fill='%23f5b83d'/%3E%3Cpath d='M16 20V27M11 27H21' stroke='%23f5b83d' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <a class="skip" href="#resultado">Saltar al resultado</a>
+  <div class="glow" aria-hidden="true"></div>
+
+  <header class="top wrap">
+    <a class="brand" href="./" aria-label="Drunk enough? Inicio">
+      <span class="brand__mark" id="logo"></span>
+      <span class="brand__name">Drunk enough<span class="brand__q">?</span></span>
+    </a>
+    <p class="pill"><span class="pill__dot" aria-hidden="true"></span>Herramienta educativa · no es consejo médico</p>
+  </header>
+
+  <main class="layout wrap" id="main">
+    <div class="intro">
+      <h1>¿Cómo te va a pegar <em>esta noche</em>?</h1>
+      <p class="lead">Pon tu perfil, cuánto dura la salida y lo que llevas. Te mostramos tu alcohol en sangre estimado, con su margen de error, y cómo te vas a sentir.</p>
+    </div>
+
+    <div class="inputs">
+      <!-- Perfil -->
+      <section class="card" aria-labelledby="perfil-h">
+        <div class="card__head">
+          <h2 id="perfil-h">Tu perfil</h2>
+          <span class="step" aria-hidden="true">01</span>
+        </div>
+
+        <form class="fields" id="perfil" novalidate>
+          <fieldset class="field field--wide">
+            <legend class="label">Sexo biológico</legend>
+            <div class="segmented">
+              <label><input type="radio" name="sexo" value="F" checked><span>Mujer</span></label>
+              <label><input type="radio" name="sexo" value="M"><span>Hombre</span></label>
+            </div>
+          </fieldset>
+
+          <div class="field">
+            <div class="field__top">
+              <label class="label" for="edad">Edad</label>
+              <output class="value" for="edad" id="edad-out"></output>
+            </div>
+            <input type="range" id="edad" name="edad">
+          </div>
+
+          <div class="field">
+            <div class="field__top">
+              <label class="label" for="estatura_cm">Estatura</label>
+              <output class="value" for="estatura_cm" id="estatura_cm-out"></output>
+            </div>
+            <input type="range" id="estatura_cm" name="estatura_cm">
+          </div>
+
+          <div class="field">
+            <div class="field__top">
+              <label class="label" for="peso_kg">Peso</label>
+              <output class="value" for="peso_kg" id="peso_kg-out"></output>
+            </div>
+            <input type="range" id="peso_kg" name="peso_kg">
+          </div>
+
+          <div class="field">
+            <div class="field__top">
+              <label class="label" for="horas_consumo">Horas tomando</label>
+              <output class="value" for="horas_consumo" id="horas_consumo-out"></output>
+            </div>
+            <input type="range" id="horas_consumo" name="horas_consumo" aria-describedby="horas-help">
+            <p class="help" id="horas-help">Cuánto dura la salida: de 30 min a 6 h.</p>
+          </div>
+        </form>
+      </section>
+
+      <!-- Tragos -->
+      <section class="card" aria-labelledby="tragos-h">
+        <div class="card__head">
+          <h2 id="tragos-h">Lo que llevas o planeas</h2>
+          <span class="step" aria-hidden="true">02</span>
+        </div>
+        <ul class="drinks" id="drinks"></ul>
+
+        <!-- «Tu mesa»: un vasito por trago. Decorativa: el resumen en texto está en el pie. -->
+        <div class="table is-empty" id="table" aria-hidden="true">
+          <p class="table__label">Tu mesa</p>
+          <p class="table__empty">Aquí aparecen tus tragos</p>
+          <div class="table__row" id="table-row"><span class="table__more" id="table-more" hidden></span></div>
+          <div class="table__top"></div>
+        </div>
+
+        <div class="drinks__foot">
+          <p class="total"><span class="label">Alcohol puro</span> <strong id="total-g">0 g</strong> <span class="total__max" id="total-max"></span></p>
+          <button type="button" class="btn btn--ghost" id="reset">
+            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M4 10a6 6 0 1 0 2-4.5M4 3v3.5h3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Reiniciar tragos
+          </button>
+        </div>
+      </section>
+    </div>
+
+    <!-- Resultado: panel fijo (sticky en escritorio) + detalles -->
+    <div class="side">
+      <section class="card panel" id="resultado" tabindex="-1" aria-labelledby="res-h" aria-busy="true">
+        <div class="card__head">
+          <h2 id="res-h">Cómo vas</h2>
+          <span class="live" aria-hidden="true"><span class="live__dot"></span>en vivo</span>
+        </div>
+
+        <div class="hero" id="hero">
+          <div class="beer" id="beer" aria-hidden="true">
+            <svg viewBox="0 0 120 172" class="beer__svg">
+              <defs><clipPath id="beer-clip"><path d="M16 14 H104 L94.5 153 Q94 162 85 162 H35 Q26 162 25.5 153 Z"/></clipPath></defs>
+              <g clip-path="url(#beer-clip)">
+                <rect class="beer__bg" x="0" y="0" width="120" height="172"/>
+                <g class="beer__level" id="beer-level">
+                  <g class="beer__wave">
+                    <path class="beer__liquid" d="M-120 8 Q-105 2 -90 8 T-60 8 T-30 8 T0 8 T30 8 T60 8 T90 8 T120 8 T150 8 T180 8 T210 8 T240 8 V400 H-120 Z"/>
+                  </g>
+                </g>
+                <g class="beer__bubbles">
+                  <circle cx="38" cy="156" r="2.6"/><circle cx="52" cy="158" r="1.7"/><circle cx="66" cy="155" r="2.2"/>
+                  <circle cx="80" cy="157" r="1.4"/><circle cx="45" cy="157" r="1.5"/><circle cx="73" cy="156" r="2.4"/>
+                  <circle cx="59" cy="158" r="1.2"/><circle cx="86" cy="155" r="1.8"/>
+                </g>
+              </g>
+              <line class="beer__limit" x1="20" x2="100" y1="22" y2="22"/>
+              <text class="beer__limit-t" x="60" y="34" text-anchor="middle">120</text>
+              <path class="beer__outline" d="M16 14 H104 L94.5 153 Q94 162 85 162 H35 Q26 162 25.5 153 Z"/>
+              <path class="beer__shine" d="M27 28 L33 140"/>
+            </svg>
+          </div>
+
+          <div class="hero__info">
+            <div class="face-wrap" id="face"></div>
+            <p class="stage-name"><span class="sr-only">Etapa estimada: </span><span id="stage-name">—</span></p>
+            <p class="bac__num"><span id="bac-num">0,0</span><span class="bac__pm">± <span id="mae"></span></span></p>
+            <p class="bac__unit">mg/100 mL en sangre <span class="bac__pct" id="bac-pct"></span></p>
+            <p class="bac__range" id="bac-range"></p>
+          </div>
+        </div>
+
+        <div class="meter" id="meter">
+          <div class="meter__track">
+            <div class="meter__band" id="meter-band"></div>
+            <div class="meter__fill" id="meter-fill"></div>
+            <span class="meter__tick" style="--at:37.5%"></span>
+            <span class="meter__tick meter__tick--limit" style="--at:75%"></span>
+          </div>
+          <div class="meter__labels" aria-hidden="true">
+            <span style="--at:0%">0</span><span style="--at:37.5%">60</span><span style="--at:75%">120</span>
+          </div>
+          <p class="meter__status" id="meter-status"></p>
+        </div>
+
+        <!-- Aviso de cambio de etapa: vive dentro del panel, no tapa nada.
+             En escritorio ocupa un hueco fijo para que la fila no cambie de alto. -->
+        <div class="stage-slot">
+          <p class="stage-slot__idle" aria-hidden="true">Si cambias de etapa, te avisamos aquí.</p>
+          <div class="stage-alert" id="toast" role="status" aria-live="polite" aria-atomic="true">
+            <div class="stage-alert__in" id="toast-in"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card details" aria-label="Detalles de la estimación">
+        <div class="state state--error" id="error" role="alert" hidden></div>
+
+        <div class="state state--out" id="out" role="alert" hidden>
+          <h3>Fuera de los límites de la simulación</h3>
+          <p id="out-text"></p>
+        </div>
+
+        <div id="ok">
+          <div class="feel">
+            <h3 id="stage-title"></h3>
+            <p id="stage-msg"></p>
+            <p class="feel__tip" id="stage-tip"></p>
+            <p class="feel__warn" id="stage-warn" hidden></p>
+          </div>
+
+          <div class="infos">
+            <div class="info" id="next"></div>
+            <div class="info" id="margin"></div>
+          </div>
+
+          <p class="note" id="band-note"></p>
+        </div>
+
+        <aside class="mix" id="mix" hidden>
+          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M7 3h6M8 3v4L4 15a2 2 0 0 0 1.8 3h8.4A2 2 0 0 0 16 15l-4-8V3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+          <p id="mix-text"></p>
+        </aside>
+
+        <aside class="disclaimer">
+          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10 9v5M10 6.2v.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <p id="disclaimer"></p>
+        </aside>
+      </section>
+    </div>
+  </main>
+
+  <footer class="foot wrap">
+    <h2 class="foot__h">Para que la noche termine bien</h2>
+    <ul class="tips" id="tips"></ul>
+  </footer>
+
+  <!-- Barra compacta en móvil: cara, vaso y BAC siempre a la vista -->
+  <a class="dock" id="dock" href="#resultado" hidden>
+    <span class="dock__msg" id="dock-msg" aria-hidden="true"></span>
+    <span class="dock__row">
+      <span class="dock__face" id="dock-face" aria-hidden="true"></span>
+      <span class="dock__glass" id="dock-glass" aria-hidden="true"></span>
+      <span class="dock__num"><span class="dock__bac" id="dock-bac">0,0</span><span class="dock__unit">mg/100 mL</span></span>
+      <span class="dock__stage" id="dock-stage">Sobrio</span>
+      <span class="dock__go" aria-hidden="true">Ver</span>
+    </span>
+  </a>
+
+  <noscript><p class="wrap">Esta herramienta necesita JavaScript para calcular en vivo.</p></noscript>
+</body>
+</html>
